@@ -14,25 +14,31 @@ namespace TestProject
         {
             var context = ApplicationDbContextInMemory.Get();
             var mapper = ApplicationDbContextInMemory.GetMapper();
-            context.Add(new Product()
+
+            context.Product.Add(new Product()
             {
                 FullName = "Laptop",
                 DisplayName = "ASUS ROG TEST",
                 Description = "Gaming laptop with high performance",
                 Price = 10.90M,
+                IsActive = true,
                 CreationDate = DateTime.Now,
                 ExpireDate = DateTime.Now,
                 CategoryId = 2,
                 AvailableQty = 1,
-                LastModificationDate = DateTime.Now
+                LastModificationDate = DateTime.Now,
+                IsDeleted = false
             });
-            context.SaveChanges();
-            var context2 = ApplicationDbContextInMemory.Get();
-            var commonServices = new CommonRequiredServices(context2, mapper);
+            await context.SaveChangesAsync();
+
+            var commonServices = new CommonRequiredServices(context, mapper);
             var productService = new ProductsService(commonServices);
+
             var response = await productService.GetListOfProducts();
+
             Assert.AreEqual(1, response.Count());
         }
+
 
         [TestMethod]
         public async Task TryToCreateProduct()
@@ -51,17 +57,18 @@ namespace TestProject
                 AvailableQty = 1,
                 LastModificationDate = DateTime.Now
             };
-            context.SaveChanges();
-            var context2 = ApplicationDbContextInMemory.Get();
-            var commonServices = new CommonRequiredServices(context2, mapper);
+
+            var commonServices = new CommonRequiredServices(context, mapper);
             var productService = new ProductsService(commonServices);
+
             await productService.CreateNewProduct(product);
-            var response = await context.Product.ToArrayAsync();
-            Assert.AreEqual(1, response.Count());
+            var response = await context.Product.CountAsync();
+
+            Assert.AreEqual(1, response);
         }
 
         [TestMethod]
-        public async Task TryToRemoveUser()
+        public async Task TryToRemoveProduct()
         {
             var context = ApplicationDbContextInMemory.Get();
             var mapper = ApplicationDbContextInMemory.GetMapper();
@@ -77,21 +84,22 @@ namespace TestProject
                 AvailableQty = 1,
                 LastModificationDate = DateTime.Now
             };
-            context.Add(product);
-            context.SaveChanges();
+            await context.AddAsync(product);
+            await context.SaveChangesAsync();
             var productId = product.Id;
 
-            var context2 = ApplicationDbContextInMemory.Get();
-            var commonServices = new CommonRequiredServices(context2, mapper);
+            var commonServices = new CommonRequiredServices(context, mapper);
             var productService = new ProductsService(commonServices);
+
             await productService.RemoveProduct(productId);
 
-            var response = await context.Product.FirstOrDefaultAsync(p => p.Id == productId);
-            Assert.AreEqual(true, response.IsDeleted);
+            var deletedProduct = await context.Product.FirstOrDefaultAsync(p => p.Id == productId);
+
+            Assert.IsTrue(deletedProduct.IsDeleted);
         }
 
         [TestMethod]
-        public async Task TryToModifyUser()
+        public async Task TryToModifyProduct()
         {
             var context = ApplicationDbContextInMemory.Get();
             var mapper = ApplicationDbContextInMemory.GetMapper();
@@ -107,12 +115,13 @@ namespace TestProject
                 AvailableQty = 1,
                 LastModificationDate = DateTime.Now
             };
-            context.Add(product);
-            context.SaveChanges();
+            await context.AddAsync(product);
+            await context.SaveChangesAsync();
 
             var productId = product.Id;
-            var product2 = new ProductDto()
+            var updatedProduct = new ProductDto()
             {
+                Id = productId,
                 FullName = "Laptop",
                 DisplayName = "Alienware M16",
                 Description = "Gaming laptop with high performance",
@@ -123,12 +132,15 @@ namespace TestProject
                 AvailableQty = 1,
                 LastModificationDate = DateTime.Now
             };
-            var context2 = ApplicationDbContextInMemory.Get();
-            var commonServices = new CommonRequiredServices(context2, mapper);
+
+            var commonServices = new CommonRequiredServices(context, mapper);
             var productService = new ProductsService(commonServices);
-            await productService.EditProduct(product2);
-            var finalProduct = await context2.Product.FirstOrDefaultAsync();
-            Assert.AreEqual(finalProduct.DisplayName, product2.DisplayName);
+
+            await productService.EditProduct(updatedProduct);
+            var finalProduct = await context.Product.FindAsync(productId);
+
+            Assert.AreEqual(updatedProduct.DisplayName, finalProduct.DisplayName);
         }
     }
+
 }
